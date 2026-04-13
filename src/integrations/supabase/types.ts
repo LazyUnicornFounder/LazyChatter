@@ -76,6 +76,44 @@ export type Database = {
         }
         Relationships: []
       }
+      room_progress: {
+        Row: {
+          created_at: string
+          first_signup: boolean
+          id: string
+          logo_done: boolean
+          room_id: string
+          shared: boolean
+          waitlist_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          first_signup?: boolean
+          id?: string
+          logo_done?: boolean
+          room_id: string
+          shared?: boolean
+          waitlist_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          first_signup?: boolean
+          id?: string
+          logo_done?: boolean
+          room_id?: string
+          shared?: boolean
+          waitlist_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_progress_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: true
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rooms: {
         Row: {
           created_at: string
@@ -119,6 +157,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "saved_rooms_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waitlist_emails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_emails_room_id_fkey"
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"

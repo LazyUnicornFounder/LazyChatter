@@ -18,13 +18,13 @@ type Message = {
 const Room = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ name: string; emoji: string } | null>(null);
+  const [chatUser, setChatUser] = useState<{ name: string; emoji: string } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [shipping, setShipping] = useState(false);
   const [roomData, setRoomData] = useState<{ shipped: boolean; deployed_url: string | null } | null>(null);
   const [isSaved, setIsSaved] = useState(false);
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasShownInvite = useRef(false);
 

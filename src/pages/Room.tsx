@@ -619,8 +619,8 @@ const Room = () => {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">
-            {getUsageCount('ships')}/{FREE_LIMITS.ships} ships
+          <span className="text-xs text-muted-foreground" title="Free ships remaining on this device">
+            🚀 {getUsageCount('ships')}/{FREE_LIMITS.ships} ships used
           </span>
           <button
             onClick={toggleSave}

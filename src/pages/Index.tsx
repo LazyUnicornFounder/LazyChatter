@@ -16,7 +16,7 @@ const Index = () => {
 
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
-        <span className="text-xl font-bold text-primary">LazyShip 🚀</span>
+        <span className="text-xl font-bold text-primary flex items-center gap-2">LazyShip 🚀 <span className="text-[10px] font-semibold bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full uppercase tracking-wider">Beta</span></span>
         <button
           onClick={handleStartRoom}
           className="bg-primary text-primary-foreground font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity"

@@ -76,6 +76,14 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    const styleInstruction = remix_style
+      ? `IMPORTANT: Use a "${remix_style}" design aesthetic instead of the default dark theme. Be creative and fully commit to the ${remix_style} vibe.`
+      : `Design: dark bg #0a0a0b, brand color #7fff00, accent #ff3cac, Space Grotesk font from Google Fonts, glassmorphism cards (bg-white/5 backdrop-blur-xl border border-white/10), glow effects, bold and fun for Gen Z.`;
+
+    const waitlistInstruction = waitlistEnabled
+      ? `IMPORTANT: Include a WORKING email waitlist form. The form must POST to "${supabaseUrl}/functions/v1/collect-email" with JSON body { "room_id": "${room_id}", "email": "<user_email>" }. On success, replace the form with "You're on the list 🎉". Use fetch() in the form's onsubmit handler. The form must actually work — not just be visual.`
+      : `Include a visual-only email waitlist form (no backend, just looks nice).`;
+
     const aiResponse = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
@@ -89,7 +97,7 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You read a casual chat between friends brainstorming a product idea. Extract: product_name, tagline (max 10 words), description (2 sentences), features (3-5 bullet points), audience (who is this for), pricing (if mentioned, otherwise 'Coming soon'), cta_text (e.g. 'Join the waitlist'). Then generate a complete single-file HTML landing page using Tailwind CDN (add <script src="https://cdn.tailwindcss.com"></script>). Design: dark bg #0a0a0b, brand color #7fff00, accent #ff3cac, Space Grotesk font from Google Fonts, glassmorphism cards (bg-white/5 backdrop-blur-xl border border-white/10), glow effects, bold and fun for Gen Z. Include: hero with product name and tagline, features section, pricing if mentioned, email waitlist form (just visual, no backend), footer. Make it look premium and exciting. If you cannot identify a clear product idea, return JSON: { "no_idea": true }. Otherwise return JSON: { "product_name": "...", "tagline": "...", "html": "<!DOCTYPE html>..." }. Return ONLY valid JSON, no markdown.`,
+              content: `You read a casual chat between friends brainstorming a product idea. Extract: product_name, tagline (max 10 words), description (2 sentences), features (3-5 bullet points), audience (who is this for), pricing (if mentioned, otherwise 'Coming soon'), cta_text (e.g. 'Join the waitlist'). Then generate a complete single-file HTML landing page using Tailwind CDN (add <script src="https://cdn.tailwindcss.com"></script>). ${styleInstruction} Include: hero with product name and tagline, features section, pricing if mentioned, ${waitlistInstruction}, footer. Make it look premium and exciting. If you cannot identify a clear product idea, return JSON: { "no_idea": true }. Otherwise return JSON: { "product_name": "...", "tagline": "...", "html": "<!DOCTYPE html>..." }. Return ONLY valid JSON, no markdown.`,
             },
             {
               role: "user",

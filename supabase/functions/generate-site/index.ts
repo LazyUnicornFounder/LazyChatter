@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { room_id } = await req.json();
+    const { room_id, remix_style } = await req.json();
     if (!room_id) {
       return new Response(JSON.stringify({ error: "room_id required" }), {
         status: 400,
@@ -24,6 +24,25 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check remix limits
+    if (remix_style) {
+      const { data: room } = await supabase.from("rooms").select("remix_count").eq("id", room_id).single();
+      if (room && room.remix_count >= 3) {
+        return new Response(
+          JSON.stringify({ error: "🔒 Free remixes used up! Upgrade to Pro for unlimited remixes." }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Check if waitlist is enabled
+    const { data: progressData } = await supabase
+      .from("room_progress")
+      .select("waitlist_enabled")
+      .eq("room_id", room_id)
+      .maybeSingle();
+    const waitlistEnabled = progressData?.waitlist_enabled ?? false;
 
     // Fetch last 50 messages
     const { data: messages, error: msgError } = await supabase

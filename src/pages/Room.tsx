@@ -147,12 +147,191 @@ const Room = () => {
     if (!input.trim() || !chatUser || !roomId) return;
     const content = input.trim().substring(0, 500);
     setInput('');
+
+    // Handle commands
+    if (content.startsWith('/')) {
+      await handleCommand(content);
+      return;
+    }
+
     await supabase.from('messages').insert({
       room_id: roomId,
       sender_name: chatUser.name,
       sender_emoji: chatUser.emoji,
       content,
       type: 'chat',
+    });
+  };
+
+  const handleCommand = async (cmd: string) => {
+    if (!roomId) return;
+    const command = cmd.toLowerCase().trim();
+
+    if (command === '/analytics') {
+      await handleAnalytics();
+    } else if (command === '/emails') {
+      await handleEmails();
+    } else if (command === '/roast') {
+      await handleRoast();
+    } else if (command === '/remix') {
+      await handleRemix();
+    } else if (command === '/waitlist') {
+      await handleWaitlist();
+    } else if (command === '/logo') {
+      await supabase.from('messages').insert({
+        room_id: roomId, sender_name: 'system', sender_emoji: '',
+        content: '🎨 Logo generation coming soon! For now, describe your logo idea in chat and we\'ll include it in the next ship.',
+        type: 'system',
+      });
+    } else {
+      await supabase.from('messages').insert({
+        room_id: roomId, sender_name: 'system', sender_emoji: '',
+        content: `❓ Unknown command: ${cmd}. Try /analytics, /emails, /roast, /remix, or /waitlist`,
+        type: 'system',
+      });
+    }
+  };
+
+  const handleAnalytics = async () => {
+    if (!roomId) return;
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: '📊 Fetching analytics...', type: 'system',
+    });
+
+    const { data: views } = await supabase
+      .from('page_views').select('*').eq('room_id', roomId);
+    const { count: signupCount } = await supabase
+      .from('waitlist_emails').select('*', { count: 'exact', head: true }).eq('room_id', roomId);
+
+    const totalViews = views?.length ?? 0;
+    const uniqueReferrers = [...new Set((views || []).map(v => v.referrer).filter(Boolean))];
+    const topReferrers = uniqueReferrers.slice(0, 5).map(r => `  • ${r}`).join('\n') || '  • Direct traffic';
+
+    const analyticsContent = `📊 Analytics\n👀 ${totalViews} total views\n📧 ${signupCount ?? 0} waitlist signups\n🔗 Top referrers:\n${topReferrers}`;
+
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: analyticsContent, type: 'analytics',
+    });
+  };
+
+  const handleEmails = async () => {
+    if (!roomId) return;
+    const { data: emails } = await supabase
+      .from('waitlist_emails').select('*').eq('room_id', roomId).order('created_at', { ascending: false });
+
+    if (!emails || emails.length === 0) {
+      await supabase.from('messages').insert({
+        room_id: roomId, sender_name: 'system', sender_emoji: '',
+        content: '📧 No waitlist signups yet. Enable waitlist and share your site!', type: 'system',
+      });
+      return;
+    }
+
+    const emailList = emails.map(e => e.email).join('\n');
+    const newest = emails[0];
+    const content = `📧 Waitlist Emails (${emails.length} total)\nNewest: ${newest.email} (${new Date(newest.created_at).toLocaleDateString()})\n---\n${emailList}`;
+
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content, type: 'emails',
+    });
+  };
+
+  const handleRoast = async () => {
+    if (!roomId) return;
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: '🔥 Getting roasted...', type: 'system',
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('roast', {
+        body: { room_id: roomId },
+      });
+      if (error) throw error;
+
+      if (data?.error) {
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: data.error, type: 'system',
+        });
+      } else {
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: data.roast, type: 'roast',
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      await supabase.from('messages').insert({
+        room_id: roomId, sender_name: 'system', sender_emoji: '',
+        content: '😅 Roast failed. Try again!', type: 'system',
+      });
+    }
+  };
+
+  const handleRemix = async () => {
+    if (!roomId || shipping) return;
+    setShipping(true);
+
+    const styles = ['cyberpunk neon', 'retro pixel art', 'minimal zen', 'Y2K aesthetic', 'brutalist'];
+    const style = styles[Math.floor(Math.random() * styles.length)];
+
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: `🎨 Remixing with ${style} vibes...`, type: 'system',
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-site', {
+        body: { room_id: roomId, remix_style: style },
+      });
+      if (error) throw error;
+
+      if (data?.error) {
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: data.error, type: 'system',
+        });
+      } else if (data?.deployed_url) {
+        setRoomData({ shipped: true, deployed_url: data.deployed_url });
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: `🎨 Remixed! New vibe: ${style}\n${data.deployed_url}`,
+          type: 'ship-success',
+        });
+      } else if (data?.html) {
+        const blob = new Blob([data.html], { type: 'text/html' });
+        const previewUrl = URL.createObjectURL(blob);
+        setRoomData({ shipped: true, deployed_url: previewUrl });
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: `🎨 Remixed! New vibe: ${style} (Preview)\n${previewUrl}`,
+          type: 'ship-success',
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      await supabase.from('messages').insert({
+        room_id: roomId, sender_name: 'system', sender_emoji: '',
+        content: '😅 Remix failed. Try again!', type: 'system',
+      });
+    } finally {
+      setShipping(false);
+    }
+  };
+
+  const handleWaitlist = async () => {
+    if (!roomId) return;
+    // Enable waitlist in progress
+    await supabase.from('room_progress').update({ waitlist_enabled: true } as any).eq('room_id', roomId);
+
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: '📧 Waitlist enabled! Next time you ship or remix, the landing page will include a working email signup form.',
+      type: 'system',
     });
   };
 
@@ -272,9 +451,55 @@ const Room = () => {
         {messages.map((msg) => {
           if (msg.type === 'system') {
             return (
-              <p key={msg.id} className="text-center text-sm text-muted-foreground py-1">
+              <p key={msg.id} className="text-center text-sm text-muted-foreground py-1 whitespace-pre-wrap">
                 {msg.content}
               </p>
+            );
+          }
+
+          if (msg.type === 'roast') {
+            return (
+              <div key={msg.id} className="flex justify-center py-4">
+                <div className="max-w-md w-full p-5 rounded-2xl bg-[#ff3cac]/10 border border-[#ff3cac]/30 space-y-2">
+                  <p className="text-sm font-bold text-[#ff3cac]">💀 Roast</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.type === 'analytics') {
+            return (
+              <div key={msg.id} className="flex justify-center py-4">
+                <div className="glass-card max-w-md w-full p-5 space-y-2">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.type === 'emails') {
+            const lines = msg.content.split('\n');
+            const header = lines.slice(0, 3).join('\n');
+            const emailList = lines.slice(3).filter(l => l && l !== '---').join(', ');
+            return (
+              <div key={msg.id} className="flex justify-center py-4">
+                <div className="glass-card max-w-md w-full p-5 space-y-3">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{header}</p>
+                  <div className="bg-white/5 rounded-xl p-3">
+                    <p className="text-xs text-muted-foreground break-all">{emailList}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(emailList);
+                      toast('Emails copied! 📋');
+                    }}
+                    className="text-xs bg-primary text-primary-foreground font-bold px-3 py-1.5 rounded-lg hover:opacity-90"
+                  >
+                    Copy All 📋
+                  </button>
+                </div>
+              </div>
             );
           }
 

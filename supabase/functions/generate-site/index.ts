@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { room_id } = await req.json();
+    const { room_id, remix_style } = await req.json();
     if (!room_id) {
       return new Response(JSON.stringify({ error: "room_id required" }), {
         status: 400,
@@ -24,6 +24,25 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check remix limits
+    if (remix_style) {
+      const { data: room } = await supabase.from("rooms").select("remix_count").eq("id", room_id).single();
+      if (room && room.remix_count >= 3) {
+        return new Response(
+          JSON.stringify({ error: "🔒 Free remixes used up! Upgrade to Pro for unlimited remixes." }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Check if waitlist is enabled
+    const { data: progressData } = await supabase
+      .from("room_progress")
+      .select("waitlist_enabled")
+      .eq("room_id", room_id)
+      .maybeSingle();
+    const waitlistEnabled = progressData?.waitlist_enabled ?? false;
 
     // Fetch last 50 messages
     const { data: messages, error: msgError } = await supabase
@@ -57,6 +76,14 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    const styleInstruction = remix_style
+      ? `IMPORTANT: Use a "${remix_style}" design aesthetic instead of the default dark theme. Be creative and fully commit to the ${remix_style} vibe.`
+      : `Design: dark bg #0a0a0b, brand color #7fff00, accent #ff3cac, Space Grotesk font from Google Fonts, glassmorphism cards (bg-white/5 backdrop-blur-xl border border-white/10), glow effects, bold and fun for Gen Z.`;
+
+    const waitlistInstruction = waitlistEnabled
+      ? `IMPORTANT: Include a WORKING email waitlist form. The form must POST to "${supabaseUrl}/functions/v1/collect-email" with JSON body { "room_id": "${room_id}", "email": "<user_email>" }. On success, replace the form with "You're on the list 🎉". Use fetch() in the form's onsubmit handler. The form must actually work — not just be visual.`
+      : `Include a visual-only email waitlist form (no backend, just looks nice).`;
+
     const aiResponse = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
@@ -70,7 +97,7 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You read a casual chat between friends brainstorming a product idea. Extract: product_name, tagline (max 10 words), description (2 sentences), features (3-5 bullet points), audience (who is this for), pricing (if mentioned, otherwise 'Coming soon'), cta_text (e.g. 'Join the waitlist'). Then generate a complete single-file HTML landing page using Tailwind CDN (add <script src="https://cdn.tailwindcss.com"></script>). Design: dark bg #0a0a0b, brand color #7fff00, accent #ff3cac, Space Grotesk font from Google Fonts, glassmorphism cards (bg-white/5 backdrop-blur-xl border border-white/10), glow effects, bold and fun for Gen Z. Include: hero with product name and tagline, features section, pricing if mentioned, email waitlist form (just visual, no backend), footer. Make it look premium and exciting. If you cannot identify a clear product idea, return JSON: { "no_idea": true }. Otherwise return JSON: { "product_name": "...", "tagline": "...", "html": "<!DOCTYPE html>..." }. Return ONLY valid JSON, no markdown.`,
+              content: `You read a casual chat between friends brainstorming a product idea. Extract: product_name, tagline (max 10 words), description (2 sentences), features (3-5 bullet points), audience (who is this for), pricing (if mentioned, otherwise 'Coming soon'), cta_text (e.g. 'Join the waitlist'). Then generate a complete single-file HTML landing page using Tailwind CDN (add <script src="https://cdn.tailwindcss.com"></script>). ${styleInstruction} Include: hero with product name and tagline, features section, pricing if mentioned, ${waitlistInstruction}, footer. Make it look premium and exciting. If you cannot identify a clear product idea, return JSON: { "no_idea": true }. Otherwise return JSON: { "product_name": "...", "tagline": "...", "html": "<!DOCTYPE html>..." }. Return ONLY valid JSON, no markdown.`,
             },
             {
               role: "user",
@@ -161,7 +188,8 @@ serve(async (req) => {
       );
     }
 
-    const { product_name, tagline, html } = result;
+    const { product_name, tagline } = result;
+    let { html } = result;
 
     if (!html) {
       return new Response(
@@ -173,6 +201,18 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // Inject tracking pixel before </body>
+    const trackingPixel = `<img src="${supabaseUrl}/functions/v1/track-view?room_id=${room_id}" width="1" height="1" style="position:absolute;opacity:0" />`;
+    html = html.replace("</body>", `${trackingPixel}</body>`);
+
+    // If remix, increment counter
+    if (remix_style) {
+      await supabase.rpc("", {}).catch(() => {});
+      // Simple increment via raw update
+      const { data: currentRoom } = await supabase.from("rooms").select("remix_count").eq("id", room_id).single();
+      await supabase.from("rooms").update({ remix_count: (currentRoom?.remix_count || 0) + 1 }).eq("id", room_id);
     }
 
     // Deploy to Vercel

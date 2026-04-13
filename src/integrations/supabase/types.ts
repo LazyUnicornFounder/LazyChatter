@@ -52,6 +52,38 @@ export type Database = {
           },
         ]
       }
+      page_views: {
+        Row: {
+          country: string | null
+          id: string
+          referrer: string | null
+          room_id: string
+          viewed_at: string
+        }
+        Insert: {
+          country?: string | null
+          id?: string
+          referrer?: string | null
+          room_id: string
+          viewed_at?: string
+        }
+        Update: {
+          country?: string | null
+          id?: string
+          referrer?: string | null
+          room_id?: string
+          viewed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_views_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -119,18 +151,21 @@ export type Database = {
           created_at: string
           deployed_url: string | null
           id: string
+          remix_count: number
           shipped: boolean
         }
         Insert: {
           created_at?: string
           deployed_url?: string | null
           id: string
+          remix_count?: number
           shipped?: boolean
         }
         Update: {
           created_at?: string
           deployed_url?: string | null
           id?: string
+          remix_count?: number
           shipped?: boolean
         }
         Relationships: []

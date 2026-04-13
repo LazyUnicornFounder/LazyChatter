@@ -1,16 +1,83 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useNavigate } from 'react-router-dom';
+import FloatingEmojis from '@/components/FloatingEmojis';
+import DemoChat from '@/components/DemoChat';
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const navigate = useNavigate();
+
+  const handleStartRoom = () => {
+    const id = Math.random().toString(36).substring(2, 8);
+    navigate(`/room/${id}`);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background relative dot-grid">
+      <FloatingEmojis />
+
+      {/* Nav */}
+      <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
+        <span className="text-xl font-bold text-primary">LazyShip 🚀</span>
+        <button
+          onClick={handleStartRoom}
+          className="bg-primary text-primary-foreground font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity"
+        >
+          Launch a Room
+        </button>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative z-10 text-center pt-20 pb-16 px-6 max-w-4xl mx-auto">
+        <h1 className="text-5xl sm:text-7xl font-bold gradient-text-lime-cyan leading-tight mb-6">
+          Talk about it.<br />Ship it. 🛸
+        </h1>
+        <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+          Chat with your friend about an idea. Hit one button. Live website in 30 seconds.
+        </p>
+        <button
+          onClick={handleStartRoom}
+          className="bg-primary text-primary-foreground font-bold text-lg px-8 py-4 rounded-xl glow-lime glow-lime-hover transition-all hover:scale-105"
+        >
+          Start a Room →
+        </button>
+        <p className="text-sm text-muted-foreground mt-4">
+          no sign up. no download. just vibes.
+        </p>
+      </section>
+
+      {/* Demo Chat */}
+      <section className="relative z-10 py-16 px-6 max-w-4xl mx-auto">
+        <h2 className="text-2xl font-bold text-center text-foreground mb-8">
+          See it in action ⚡
+        </h2>
+        <DemoChat />
+      </section>
+
+      {/* Feature Cards */}
+      <section className="relative z-10 py-16 px-6 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            { emoji: '💬', title: 'Just Chat', desc: 'No briefs, no wireframes, just talk.' },
+            { emoji: '⚡', title: '30 Seconds', desc: 'AI builds and deploys instantly.' },
+            { emoji: '🔗', title: 'Share the Link', desc: 'Your idea is live on the internet.' },
+          ].map((card) => (
+            <div
+              key={card.title}
+              className="glass-card glass-card-hover p-8 text-center transition-all duration-300 hover:scale-105"
+            >
+              <span className="text-4xl mb-4 block">{card.emoji}</span>
+              <h3 className="text-xl font-bold text-foreground mb-2">{card.title}</h3>
+              <p className="text-muted-foreground text-sm">{card.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative z-10 text-center py-12 text-muted-foreground text-sm">
+        made for people with more ideas than time 😴
+      </footer>
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;

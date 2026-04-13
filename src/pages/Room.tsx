@@ -32,7 +32,7 @@ const Room = () => {
   useEffect(() => {
     const name = localStorage.getItem('lazyship_name');
     const emoji = localStorage.getItem('lazyship_emoji');
-    if (name && emoji) setUser({ name, emoji });
+    if (name && emoji) setChatUser({ name, emoji });
   }, []);
 
   // Ensure room exists
@@ -188,7 +188,7 @@ const Room = () => {
   };
 
   if (!user) {
-    return <UserSetup onComplete={(name, emoji) => setUser({ name, emoji })} />;
+    return <UserSetup onComplete={(name, emoji) => setChatUser({ name, emoji })} />;
   }
 
   return (

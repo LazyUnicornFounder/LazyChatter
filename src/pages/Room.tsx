@@ -153,8 +153,14 @@ const Room = () => {
     };
     loadMessages();
 
-    // Send join system message
+    // Send join system message — wait for room to exist
     const sendJoin = async () => {
+      // Wait for room to be created
+      let retries = 0;
+      while (!roomReady.current && retries < 20) {
+        await new Promise(r => setTimeout(r, 100));
+        retries++;
+      }
       await supabase.from('messages').insert({
         room_id: roomId,
         sender_name: 'system',

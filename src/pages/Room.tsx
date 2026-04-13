@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import UserSetup from '@/components/UserSetup';
 import LaunchStatus from '@/components/LaunchStatus';
+import ProUpgradeModal from '@/components/ProUpgradeModal';
 import { toast } from 'sonner';
 
 type Message = {
@@ -16,6 +17,22 @@ type Message = {
   created_at: string;
 };
 
+// Free usage limits
+const FREE_LIMITS = { ships: 3, remixes: 3, logos: 2 };
+
+const getUsage = () => {
+  try {
+    return JSON.parse(localStorage.getItem('lazyship_usage') || '{}');
+  } catch { return {}; }
+};
+const incrementUsage = (key: string) => {
+  const u = getUsage();
+  u[key] = (u[key] || 0) + 1;
+  localStorage.setItem('lazyship_usage', JSON.stringify(u));
+  return u[key];
+};
+const getUsageCount = (key: string) => getUsage()[key] || 0;
+
 const Room = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -25,6 +42,9 @@ const Room = () => {
   const [shipping, setShipping] = useState(false);
   const [roomData, setRoomData] = useState<{ shipped: boolean; deployed_url: string | null } | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [proModal, setProModal] = useState<{ open: boolean; feature?: string }>({ open: false });
+  const [awaitingLogoVibe, setAwaitingLogoVibe] = useState(false);
+  const [awaitingBuildDesc, setAwaitingBuildDesc] = useState(false);
   const { user: authUser } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasShownInvite = useRef(false);
@@ -64,6 +84,26 @@ const Room = () => {
     };
     check();
   }, [authUser, roomId]);
+
+  // Realtime feedback listener
+  useEffect(() => {
+    if (!roomId) return;
+    const channel = supabase
+      .channel(`feedback-${roomId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'feedback', filter: `room_id=eq.${roomId}` },
+        async (payload: any) => {
+          await supabase.from('messages').insert({
+            room_id: roomId, sender_name: 'system', sender_emoji: '',
+            content: `💬 New feedback: "${payload.new.message}"`,
+            type: 'system',
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId]);
 
   const toggleSave = async () => {
     if (!authUser) {
@@ -143,6 +183,15 @@ const Room = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const checkLimit = (key: string, limit: number, featureName: string): boolean => {
+    const count = getUsageCount(key);
+    if (count >= limit) {
+      setProModal({ open: true, feature: `${featureName} — you've used ${count}/${limit} free` });
+      return false;
+    }
+    return true;
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || !chatUser || !roomId) return;
     const content = input.trim().substring(0, 500);
@@ -151,6 +200,17 @@ const Room = () => {
     // Handle commands
     if (content.startsWith('/')) {
       await handleCommand(content);
+      return;
+    }
+
+    // If awaiting logo vibe words
+    if (awaitingLogoVibe) {
+      setAwaitingLogoVibe(false);
+      await supabase.from('messages').insert({
+        room_id: roomId, sender_name: chatUser.name, sender_emoji: chatUser.emoji,
+        content, type: 'chat',
+      });
+      await generateLogo(content);
       return;
     }
 
@@ -165,7 +225,8 @@ const Room = () => {
 
   const handleCommand = async (cmd: string) => {
     if (!roomId) return;
-    const command = cmd.toLowerCase().trim();
+    const parts = cmd.trim().split(/\s+/);
+    const command = parts[0].toLowerCase();
 
     if (command === '/analytics') {
       await handleAnalytics();
@@ -178,20 +239,152 @@ const Room = () => {
     } else if (command === '/waitlist') {
       await handleWaitlist();
     } else if (command === '/logo') {
-      await supabase.from('messages').insert({
-        room_id: roomId, sender_name: 'system', sender_emoji: '',
-        content: '🎨 Logo generation coming soon! For now, describe your logo idea in chat and we\'ll include it in the next ship.',
-        type: 'system',
-      });
+      await handleLogoStart();
+    } else if (command === '/build') {
+      if (parts[1]?.toLowerCase() === 'go') {
+        await handleBuildGo();
+      } else {
+        await handleBuildStart();
+      }
+    } else if (command === '/update') {
+      const desc = parts.slice(1).join(' ');
+      if (desc) {
+        await handleUpdate(desc);
+      } else {
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: '❓ Usage: /update [description of changes]', type: 'system',
+        });
+      }
+    } else if (command === '/feedback') {
+      await handleFeedback();
     } else {
       await supabase.from('messages').insert({
         room_id: roomId, sender_name: 'system', sender_emoji: '',
-        content: `❓ Unknown command: ${cmd}. Try /analytics, /emails, /roast, /remix, or /waitlist`,
+        content: `❓ Unknown command: ${cmd}. Try /analytics, /emails, /roast, /remix, /waitlist, /logo, /build, /feedback`,
         type: 'system',
       });
     }
   };
 
+  // ===== LOGO =====
+  const handleLogoStart = async () => {
+    if (!roomId) return;
+    if (!checkLimit('logos', FREE_LIMITS.logos, 'Logo generations')) return;
+    setAwaitingLogoVibe(true);
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: 'describe your vibe in 3 words 🎨', type: 'system',
+    });
+  };
+
+  const generateLogo = async (vibeWords: string, variation = false) => {
+    if (!roomId) return;
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: '🎨 Generating logo...', type: 'system',
+    });
+
+    try {
+      // Get product name from recent ship messages or room
+      const { data: shipMsgs } = await supabase
+        .from('messages')
+        .select('content')
+        .eq('room_id', roomId)
+        .eq('type', 'ship-success')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      let productName = 'My Product';
+      if (shipMsgs?.[0]) {
+        const match = shipMsgs[0].content.match(/🎉\s*(.+?)\s*(is live|is ready)/);
+        if (match) productName = match[1];
+      }
+
+      const { data, error } = await supabase.functions.invoke('generate-logo', {
+        body: { room_id: roomId, product_name: productName, vibe_words: vibeWords, variation },
+      });
+      if (error) throw error;
+
+      if (data?.error) {
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: data.error, type: 'system',
+        });
+      } else if (data?.logo_url) {
+        incrementUsage('logos');
+        // Store vibe words for "Try Again"
+        localStorage.setItem('lazyship_last_vibe', vibeWords);
+
+        await supabase.from('messages').insert({
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: `logo:${data.logo_url}:${vibeWords}`, type: 'logo',
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      await supabase.from('messages').insert({
+        room_id: roomId, sender_name: 'system', sender_emoji: '',
+        content: '😅 Logo generation failed. Try again!', type: 'system',
+      });
+    }
+  };
+
+  const handleUseLogo = async (logoUrl: string) => {
+    if (!roomId) return;
+    // Update room_progress
+    await supabase.from('room_progress').update({ logo_done: true } as any).eq('room_id', roomId);
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: '✅ Logo added! It will appear on your next ship/remix.', type: 'system',
+    });
+    // Store logo URL for the room
+    localStorage.setItem(`lazyship_logo_${roomId}`, logoUrl);
+    toast('✅ Logo added!');
+  };
+
+  const handleTryAgainLogo = async () => {
+    const vibe = localStorage.getItem('lazyship_last_vibe') || 'bold clean modern';
+    if (!checkLimit('logos', FREE_LIMITS.logos, 'Logo generations')) return;
+    await generateLogo(vibe, true);
+  };
+
+  // ===== BUILD =====
+  const handleBuildStart = async () => {
+    if (!roomId) return;
+    // Pro-only check
+    setProModal({ open: true, feature: '/build is for Pro members. Upgrade to turn your landing page into a real app' });
+  };
+
+  const handleBuildGo = async () => {
+    if (!roomId || shipping) return;
+    setProModal({ open: true, feature: '/build is for Pro members' });
+  };
+
+  const handleUpdate = async (description: string) => {
+    if (!roomId) return;
+    setProModal({ open: true, feature: '/update is for Pro members' });
+  };
+
+  // ===== FEEDBACK =====
+  const handleFeedback = async () => {
+    if (!roomId || !roomData?.deployed_url) {
+      await supabase.from('messages').insert({
+        room_id: roomId!, sender_name: 'system', sender_emoji: '',
+        content: '📦 Ship your site first before adding a feedback widget!', type: 'system',
+      });
+      return;
+    }
+
+    await supabase.from('messages').insert({
+      room_id: roomId, sender_name: 'system', sender_emoji: '',
+      content: '💬 Feedback widget enabled! Next ship/remix will include a floating feedback button.', type: 'system',
+    });
+    localStorage.setItem(`lazyship_feedback_${roomId}`, 'true');
+    toast('💬 Feedback widget enabled!');
+  };
+
+  // ===== ANALYTICS =====
   const handleAnalytics = async () => {
     if (!roomId) return;
     await supabase.from('messages').insert({
@@ -274,6 +467,7 @@ const Room = () => {
 
   const handleRemix = async () => {
     if (!roomId || shipping) return;
+    if (!checkLimit('remixes', FREE_LIMITS.remixes, 'Remixes')) return;
     setShipping(true);
 
     const styles = ['cyberpunk neon', 'retro pixel art', 'minimal zen', 'Y2K aesthetic', 'brutalist'];
@@ -296,6 +490,7 @@ const Room = () => {
           content: data.error, type: 'system',
         });
       } else if (data?.deployed_url) {
+        incrementUsage('remixes');
         setRoomData({ shipped: true, deployed_url: data.deployed_url });
         await supabase.from('messages').insert({
           room_id: roomId, sender_name: 'system', sender_emoji: '',
@@ -303,6 +498,7 @@ const Room = () => {
           type: 'ship-success',
         });
       } else if (data?.html) {
+        incrementUsage('remixes');
         const blob = new Blob([data.html], { type: 'text/html' });
         const previewUrl = URL.createObjectURL(blob);
         setRoomData({ shipped: true, deployed_url: previewUrl });
@@ -325,7 +521,6 @@ const Room = () => {
 
   const handleWaitlist = async () => {
     if (!roomId) return;
-    // Enable waitlist in progress
     await supabase.from('room_progress').update({ waitlist_enabled: true } as any).eq('room_id', roomId);
 
     await supabase.from('messages').insert({
@@ -337,9 +532,9 @@ const Room = () => {
 
   const handleShip = async () => {
     if (!roomId || shipping) return;
+    if (!checkLimit('ships', FREE_LIMITS.ships, 'Ships')) return;
     setShipping(true);
 
-    // System message
     await supabase.from('messages').insert({
       room_id: roomId,
       sender_name: 'system',
@@ -357,30 +552,24 @@ const Room = () => {
 
       if (data?.error) {
         await supabase.from('messages').insert({
-          room_id: roomId,
-          sender_name: 'system',
-          sender_emoji: '',
-          content: data.error,
-          type: 'system',
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
+          content: data.error, type: 'system',
         });
       } else if (data?.deployed_url) {
+        incrementUsage('ships');
         setRoomData({ shipped: true, deployed_url: data.deployed_url });
         await supabase.from('messages').insert({
-          room_id: roomId,
-          sender_name: 'system',
-          sender_emoji: '',
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
           content: `🎉 ${data.product_name} is live!\n${data.deployed_url}`,
           type: 'ship-success',
         });
       } else if (data?.html) {
-        // No Vercel token — show preview with HTML blob
+        incrementUsage('ships');
         const blob = new Blob([data.html], { type: 'text/html' });
         const previewUrl = URL.createObjectURL(blob);
         setRoomData({ shipped: true, deployed_url: previewUrl });
         await supabase.from('messages').insert({
-          room_id: roomId,
-          sender_name: 'system',
-          sender_emoji: '',
+          room_id: roomId, sender_name: 'system', sender_emoji: '',
           content: `🎉 ${data.product_name} is ready! (Preview — add Vercel token for live deploy)\n${previewUrl}`,
           type: 'ship-success',
         });
@@ -388,9 +577,7 @@ const Room = () => {
     } catch (e) {
       console.error(e);
       await supabase.from('messages').insert({
-        room_id: roomId,
-        sender_name: 'system',
-        sender_emoji: '',
+        room_id: roomId, sender_name: 'system', sender_emoji: '',
         content: '😅 Something went wrong while shipping. Try again!',
         type: 'system',
       });
@@ -419,6 +606,9 @@ const Room = () => {
           )}
         </div>
         <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">
+            {getUsageCount('ships')}/{FREE_LIMITS.ships} ships
+          </span>
           <button
             onClick={toggleSave}
             className={`text-sm font-medium hover:opacity-80 transition-opacity ${isSaved ? 'text-accent' : 'text-muted-foreground'}`}
@@ -498,6 +688,40 @@ const Room = () => {
                   >
                     Copy All 📋
                   </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.type === 'logo') {
+            // Parse logo:url:vibe format
+            const parts = msg.content.split(':');
+            const logoUrl = parts.slice(1, -1).join(':');
+            return (
+              <div key={msg.id} className="flex justify-center py-4">
+                <div className="glass-card max-w-sm w-full p-5 space-y-4 text-center">
+                  <p className="text-sm font-bold text-foreground">🎨 Generated Logo</p>
+                  <div className="flex justify-center">
+                    <img
+                      src={logoUrl}
+                      alt="Generated logo"
+                      className="w-32 h-32 rounded-2xl object-cover border border-white/10"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={() => handleUseLogo(logoUrl)}
+                      className="bg-primary text-primary-foreground font-bold px-4 py-2 rounded-xl text-sm hover:opacity-90"
+                    >
+                      Use This ✅
+                    </button>
+                    <button
+                      onClick={handleTryAgainLogo}
+                      className="bg-white/5 border border-white/10 text-foreground font-bold px-4 py-2 rounded-xl text-sm hover:bg-white/10"
+                    >
+                      Try Again 🔄
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -607,7 +831,7 @@ const Room = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder="Type your idea..."
+          placeholder={awaitingLogoVibe ? "Enter 3 vibe words (e.g. fast clean bold)..." : "Type your idea..."}
           maxLength={500}
           className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary text-sm"
         />
@@ -627,6 +851,13 @@ const Room = () => {
       >
         {shipping ? '...' : 'SHIP\nIT 🚀'}
       </button>
+
+      {/* Pro Upgrade Modal */}
+      <ProUpgradeModal
+        open={proModal.open}
+        onClose={() => setProModal({ open: false })}
+        feature={proModal.feature}
+      />
     </div>
   );
 };

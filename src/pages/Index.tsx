@@ -60,7 +60,7 @@ const Index = () => {
             onClick={handleStartRoom}
             className="bg-primary text-primary-foreground font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity"
           >
-            Launch a Room
+            Start a Room
           </button>
         </div>
       </nav>

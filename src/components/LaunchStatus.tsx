@@ -114,9 +114,10 @@ const LaunchStatus = ({ roomId, deployedUrl, productName, onInsertCommand }: Pro
 
   const updateProgress = async (key: keyof Progress, value: boolean) => {
     setProgress((prev) => ({ ...prev, [key]: value }));
+    const updateObj: Record<string, boolean> = { [key]: value };
     await supabase
       .from('room_progress')
-      .update({ [key]: value })
+      .update(updateObj as any)
       .eq('room_id', roomId);
   };
 
@@ -155,40 +156,44 @@ const LaunchStatus = ({ roomId, deployedUrl, productName, onInsertCommand }: Pro
 
   const [showShareMenu, setShowShareMenu] = useState(false);
 
-  const checklist = [
+  const checklist: Array<{
+    status: string;
+    label: string;
+    action?: () => void;
+    auto?: boolean;
+    pro?: boolean;
+  }> = [
     {
-      status: '✅' as const,
+      status: '✅',
       label: 'Ship your idea',
-      action: undefined,
     },
     {
-      status: (progress.logo_done ? '✅' : '⬜') as const,
+      status: progress.logo_done ? '✅' : '⬜',
       label: 'Add a logo',
       action: () => onInsertCommand('/logo'),
     },
     {
-      status: (progress.waitlist_enabled ? '✅' : '⬜') as const,
+      status: progress.waitlist_enabled ? '✅' : '⬜',
       label: 'Collect emails',
       action: () => onInsertCommand('/waitlist'),
     },
     {
-      status: (progress.shared ? '✅' : '⬜') as const,
+      status: progress.shared ? '✅' : '⬜',
       label: 'Share it',
       action: () => setShowShareMenu(!showShareMenu),
     },
     {
-      status: (progress.first_signup ? '✅' : '⬜') as const,
+      status: progress.first_signup ? '✅' : '⬜',
       label: progress.first_signup ? `Get your first signup · ${signupCount} signups 🔥` : 'Get your first signup',
-      action: undefined,
       auto: true,
     },
     {
-      status: '🔒' as const,
+      status: '🔒',
       label: 'Connect a domain',
       pro: true,
     },
     {
-      status: '🔒' as const,
+      status: '🔒',
       label: 'Get a pitch deck',
       pro: true,
     },

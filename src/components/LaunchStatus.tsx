@@ -203,6 +203,8 @@ const LaunchStatus = ({ roomId, deployedUrl, productName, onInsertCommand }: Pro
     { label: '/remix', desc: 'Remix the design' },
     { label: '/roast', desc: 'Roast my landing page' },
     { label: '/logo', desc: 'Generate a logo' },
+    { label: '/feedback', desc: 'Add feedback widget' },
+    { label: '/build', desc: 'Build a full app (Pro)' },
   ];
 
   return (

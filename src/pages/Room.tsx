@@ -32,6 +32,7 @@ const incrementUsage = (key: string) => {
   return u[key];
 };
 const getUsageCount = (key: string) => getUsage()[key] || 0;
+const getAiModeStorageKey = (roomId?: string) => `lazyship_ai_mode_${roomId ?? 'global'}`;
 
 const Room = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -70,6 +71,11 @@ const Room = () => {
     const emoji = localStorage.getItem('lazyship_emoji');
     if (name && emoji) setChatUser({ name, emoji });
   }, []);
+
+  useEffect(() => {
+    if (!roomId) return;
+    setAiMode(localStorage.getItem(getAiModeStorageKey(roomId)) === 'true');
+  }, [roomId]);
 
   // Ensure room exists
   const roomReady = useRef(false);
@@ -253,15 +259,25 @@ const Room = () => {
           body: { room_id: roomId, user_message: content },
         });
         if (error) throw error;
+        const reply = typeof data?.reply === 'string' ? data.reply.trim() : '';
+        if (!reply) throw new Error('Empty AI reply');
         await supabase.from('messages').insert({
           room_id: roomId,
           sender_name: 'AI Copilot',
           sender_emoji: '🤖',
-          content: data?.reply || "hmm let me think... 🤔",
+          content: reply,
           type: 'ai-chat',
         });
       } catch (e) {
         console.error('AI chat error:', e);
+        await supabase.from('messages').insert({
+          room_id: roomId,
+          sender_name: 'system',
+          sender_emoji: '',
+          content: '🤖 AI hit a snag — try again in a sec.',
+          type: 'system',
+        });
+        toast('AI reply failed');
       } finally {
         setAiTyping(false);
       }
@@ -693,7 +709,11 @@ const Room = () => {
               </div>
             </div>
             <button
-              onClick={() => { setAiMode(true); toast('🤖 AI Copilot activated!'); }}
+              onClick={() => {
+                setAiMode(true);
+                if (roomId) localStorage.setItem(getAiModeStorageKey(roomId), 'true');
+                toast('🤖 AI Copilot activated!');
+              }}
               className="bg-gradient-to-r from-[hsl(var(--cyan))] to-primary text-primary-foreground font-bold px-4 py-2 rounded-xl text-xs hover:opacity-90 transition-opacity"
             >
               Enable AI
@@ -710,7 +730,11 @@ const Room = () => {
             <span className="text-xs font-semibold text-[hsl(var(--cyan))]">AI Copilot active</span>
           </div>
           <button
-            onClick={() => { setAiMode(false); toast('AI Copilot disabled'); }}
+            onClick={() => {
+              setAiMode(false);
+              if (roomId) localStorage.removeItem(getAiModeStorageKey(roomId));
+              toast('AI Copilot disabled');
+            }}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Disable

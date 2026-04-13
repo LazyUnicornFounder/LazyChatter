@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import UserSetup from '@/components/UserSetup';
 import { toast } from 'sonner';
 
@@ -22,6 +23,8 @@ const Room = () => {
   const [input, setInput] = useState('');
   const [shipping, setShipping] = useState(false);
   const [roomData, setRoomData] = useState<{ shipped: boolean; deployed_url: string | null } | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasShownInvite = useRef(false);
 

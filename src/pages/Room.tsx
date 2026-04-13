@@ -838,13 +838,42 @@ const Room = () => {
         <div ref={bottomRef} />
       </div>
 
+      {/* Commands panel */}
+      {showCommands && (
+        <div className="px-4 py-3 border-t border-white/10 bg-white/[0.03] backdrop-blur-xl max-h-52 overflow-y-auto">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground">⚡ Available Commands</p>
+            <button onClick={() => setShowCommands(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
+          </div>
+          <div className="grid gap-1">
+            {COMMANDS_LIST.map((c) => (
+              <button
+                key={c.cmd}
+                onClick={() => { setInput(c.cmd); setShowCommands(false); }}
+                className="flex items-center gap-3 text-left px-3 py-2 rounded-lg hover:bg-white/5 transition-colors group"
+              >
+                <span className="text-sm font-mono font-bold text-primary min-w-[80px]">{c.cmd}</span>
+                <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{c.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input bar */}
       <div className="glass-card rounded-none border-x-0 border-b-0 px-4 py-3 flex gap-3">
+        <button
+          onClick={() => setShowCommands(!showCommands)}
+          className={`px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${showCommands ? 'bg-primary text-primary-foreground' : 'bg-white/5 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
+          title="Show commands"
+        >
+          /
+        </button>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder={awaitingLogoVibe ? "Enter 3 vibe words (e.g. fast clean bold)..." : "Type your idea..."}
+          placeholder={awaitingLogoVibe ? "Enter 3 vibe words (e.g. fast clean bold)..." : "Type your idea or /command..."}
           maxLength={500}
           className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary text-sm"
         />

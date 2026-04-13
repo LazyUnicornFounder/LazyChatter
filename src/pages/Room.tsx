@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import UserSetup from '@/components/UserSetup';
+import LaunchStatus from '@/components/LaunchStatus';
 import { toast } from 'sonner';
 
 type Message = {
@@ -256,6 +257,15 @@ const Room = () => {
           </button>
         </div>
       </div>
+
+      {/* Launch Status Panel */}
+      {roomData?.shipped && roomId && (
+        <LaunchStatus
+          roomId={roomId}
+          deployedUrl={roomData.deployed_url}
+          onInsertCommand={(cmd) => setInput(cmd)}
+        />
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">

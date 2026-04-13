@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import FloatingEmojis from '@/components/FloatingEmojis';
 import DemoChat from '@/components/DemoChat';
+import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleStartRoom = () => {
@@ -17,12 +19,37 @@ const Index = () => {
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
         <span className="text-xl font-bold text-primary flex items-center gap-2"><span className="text-xl font-bold text-primary flex items-center gap-2">Lazy Chatter 🚀 <span className="text-[10px] font-semibold bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full uppercase tracking-wider">Beta</span></span> <span className="text-[10px] font-semibold bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full uppercase tracking-wider">Beta</span></span>
-        <button
-          onClick={handleStartRoom}
-          className="bg-primary text-primary-foreground font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity"
-        >
-          Launch a Room
-        </button>
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
+              <button
+                onClick={() => navigate('/saved')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Saved ⭐
+              </button>
+              <button
+                onClick={signOut}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigate('/auth')}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Sign In
+            </button>
+          )}
+          <button
+            onClick={handleStartRoom}
+            className="bg-primary text-primary-foreground font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity"
+          >
+            Launch a Room
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}

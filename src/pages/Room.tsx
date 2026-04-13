@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import UserSetup from '@/components/UserSetup';
 import { toast } from 'sonner';
 
@@ -17,11 +18,13 @@ type Message = {
 const Room = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ name: string; emoji: string } | null>(null);
+  const [chatUser, setChatUser] = useState<{ name: string; emoji: string } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [shipping, setShipping] = useState(false);
   const [roomData, setRoomData] = useState<{ shipped: boolean; deployed_url: string | null } | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const { user: authUser } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasShownInvite = useRef(false);
 
@@ -29,7 +32,7 @@ const Room = () => {
   useEffect(() => {
     const name = localStorage.getItem('lazyship_name');
     const emoji = localStorage.getItem('lazyship_emoji');
-    if (name && emoji) setUser({ name, emoji });
+    if (name && emoji) setChatUser({ name, emoji });
   }, []);
 
   // Ensure room exists
@@ -46,9 +49,41 @@ const Room = () => {
     ensureRoom();
   }, [roomId]);
 
+  // Check if room is saved
+  useEffect(() => {
+    if (!authUser || !roomId) return;
+    const check = async () => {
+      const { data } = await supabase
+        .from('saved_rooms')
+        .select('id')
+        .eq('user_id', authUser.id)
+        .eq('room_id', roomId)
+        .maybeSingle();
+      setIsSaved(!!data);
+    };
+    check();
+  }, [authUser, roomId]);
+
+  const toggleSave = async () => {
+    if (!authUser) {
+      toast('Sign in to save rooms', { action: { label: 'Sign In', onClick: () => navigate('/auth') } });
+      return;
+    }
+    if (!roomId) return;
+    if (isSaved) {
+      await supabase.from('saved_rooms').delete().eq('user_id', authUser.id).eq('room_id', roomId);
+      setIsSaved(false);
+      toast('Room unsaved');
+    } else {
+      await supabase.from('saved_rooms').insert({ user_id: authUser.id, room_id: roomId });
+      setIsSaved(true);
+      toast('Room saved! ⭐');
+    }
+  };
+
   // Load messages & subscribe to realtime
   useEffect(() => {
-    if (!roomId || !user) return;
+    if (!roomId || !chatUser) return;
 
     const loadMessages = async () => {
       const { data } = await supabase
@@ -66,7 +101,7 @@ const Room = () => {
         room_id: roomId,
         sender_name: 'system',
         sender_emoji: '',
-        content: `${user.emoji} ${user.name} joined the room`,
+        content: `${chatUser.emoji} ${chatUser.name} joined the room`,
         type: 'system',
       });
     };
@@ -100,7 +135,7 @@ const Room = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId, user]);
+  }, [roomId, chatUser]);
 
   // Auto-scroll
   useEffect(() => {
@@ -108,13 +143,13 @@ const Room = () => {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !user || !roomId) return;
+    if (!input.trim() || !chatUser || !roomId) return;
     const content = input.trim().substring(0, 500);
     setInput('');
     await supabase.from('messages').insert({
       room_id: roomId,
-      sender_name: user.name,
-      sender_emoji: user.emoji,
+      sender_name: chatUser.name,
+      sender_emoji: chatUser.emoji,
       content,
       type: 'chat',
     });
@@ -184,8 +219,8 @@ const Room = () => {
     }
   };
 
-  if (!user) {
-    return <UserSetup onComplete={(name, emoji) => setUser({ name, emoji })} />;
+  if (!chatUser) {
+    return <UserSetup onComplete={(name, emoji) => setChatUser({ name, emoji })} />;
   }
 
   return (
@@ -203,15 +238,23 @@ const Room = () => {
             </span>
           )}
         </div>
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(window.location.href);
-            toast('Link copied! 🔗');
-          }}
-          className="text-primary text-sm font-medium hover:opacity-80"
-        >
-          Copy Link
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleSave}
+            className={`text-sm font-medium hover:opacity-80 transition-opacity ${isSaved ? 'text-accent' : 'text-muted-foreground'}`}
+          >
+            {isSaved ? '⭐ Saved' : '☆ Save'}
+          </button>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              toast('Link copied! 🔗');
+            }}
+            className="text-primary text-sm font-medium hover:opacity-80"
+          >
+            Copy Link
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -267,7 +310,7 @@ const Room = () => {
             );
           }
 
-          const isMe = msg.sender_name === user.name && msg.sender_emoji === user.emoji;
+          const isMe = msg.sender_name === chatUser.name && msg.sender_emoji === chatUser.emoji;
           return (
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import FloatingEmojis from '@/components/FloatingEmojis';
+
 import DemoChat from '@/components/DemoChat';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +27,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background relative dot-grid">
-      <FloatingEmojis />
+      
 
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">

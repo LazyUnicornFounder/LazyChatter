@@ -451,9 +451,55 @@ const Room = () => {
         {messages.map((msg) => {
           if (msg.type === 'system') {
             return (
-              <p key={msg.id} className="text-center text-sm text-muted-foreground py-1">
+              <p key={msg.id} className="text-center text-sm text-muted-foreground py-1 whitespace-pre-wrap">
                 {msg.content}
               </p>
+            );
+          }
+
+          if (msg.type === 'roast') {
+            return (
+              <div key={msg.id} className="flex justify-center py-4">
+                <div className="max-w-md w-full p-5 rounded-2xl bg-[#ff3cac]/10 border border-[#ff3cac]/30 space-y-2">
+                  <p className="text-sm font-bold text-[#ff3cac]">💀 Roast</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.type === 'analytics') {
+            return (
+              <div key={msg.id} className="flex justify-center py-4">
+                <div className="glass-card max-w-md w-full p-5 space-y-2">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.type === 'emails') {
+            const lines = msg.content.split('\n');
+            const header = lines.slice(0, 3).join('\n');
+            const emailList = lines.slice(3).filter(l => l && l !== '---').join(', ');
+            return (
+              <div key={msg.id} className="flex justify-center py-4">
+                <div className="glass-card max-w-md w-full p-5 space-y-3">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{header}</p>
+                  <div className="bg-white/5 rounded-xl p-3">
+                    <p className="text-xs text-muted-foreground break-all">{emailList}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(emailList);
+                      toast('Emails copied! 📋');
+                    }}
+                    className="text-xs bg-primary text-primary-foreground font-bold px-3 py-1.5 rounded-lg hover:opacity-90"
+                  >
+                    Copy All 📋
+                  </button>
+                </div>
+              </div>
             );
           }
 

@@ -188,7 +188,8 @@ serve(async (req) => {
       );
     }
 
-    const { product_name, tagline, html } = result;
+    const { product_name, tagline } = result;
+    let { html } = result;
 
     if (!html) {
       return new Response(
@@ -200,6 +201,18 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // Inject tracking pixel before </body>
+    const trackingPixel = `<img src="${supabaseUrl}/functions/v1/track-view?room_id=${room_id}" width="1" height="1" style="position:absolute;opacity:0" />`;
+    html = html.replace("</body>", `${trackingPixel}</body>`);
+
+    // If remix, increment counter
+    if (remix_style) {
+      await supabase.rpc("", {}).catch(() => {});
+      // Simple increment via raw update
+      const { data: currentRoom } = await supabase.from("rooms").select("remix_count").eq("id", room_id).single();
+      await supabase.from("rooms").update({ remix_count: (currentRoom?.remix_count || 0) + 1 }).eq("id", room_id);
     }
 
     // Deploy to Vercel

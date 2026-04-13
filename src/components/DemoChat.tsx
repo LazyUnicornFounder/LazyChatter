@@ -5,7 +5,7 @@ const messages = [
   { sender: 'pink', text: 'dude yes, charge $2/mo' },
   { sender: 'lime', text: 'add a leaderboard' },
   { sender: 'ship', text: '' },
-  { sender: 'system', text: '🚀 campusbites.lazychatter.app is live' },
+  { sender: 'system', text: '🚀 campusbites.lazychatter.com is live' },
 ];
 
 const DemoChat = () => {

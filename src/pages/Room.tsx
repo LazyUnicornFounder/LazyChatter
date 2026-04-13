@@ -69,7 +69,7 @@ const Room = () => {
         room_id: roomId,
         sender_name: 'system',
         sender_emoji: '',
-        content: `${user.emoji} ${user.name} joined the room`,
+        content: `${chatUser.emoji} ${chatUser.name} joined the room`,
         type: 'system',
       });
     };
@@ -103,7 +103,7 @@ const Room = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId, user]);
+  }, [roomId, chatUser]);
 
   // Auto-scroll
   useEffect(() => {
@@ -111,13 +111,13 @@ const Room = () => {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !user || !roomId) return;
+    if (!input.trim() || !chatUser || !roomId) return;
     const content = input.trim().substring(0, 500);
     setInput('');
     await supabase.from('messages').insert({
       room_id: roomId,
-      sender_name: user.name,
-      sender_emoji: user.emoji,
+      sender_name: chatUser.name,
+      sender_emoji: chatUser.emoji,
       content,
       type: 'chat',
     });
@@ -187,7 +187,7 @@ const Room = () => {
     }
   };
 
-  if (!user) {
+  if (!chatUser) {
     return <UserSetup onComplete={(name, emoji) => setChatUser({ name, emoji })} />;
   }
 
@@ -270,7 +270,7 @@ const Room = () => {
             );
           }
 
-          const isMe = msg.sender_name === user.name && msg.sender_emoji === user.emoji;
+          const isMe = msg.sender_name === chatUser.name && msg.sender_emoji === chatUser.emoji;
           return (
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>

@@ -896,6 +896,24 @@ const Room = () => {
             </div>
           );
         })}
+        {/* AI typing indicator */}
+        {aiTyping && (
+          <div className="flex justify-start">
+            <div className="max-w-[75%]">
+              <div className="flex items-center gap-1 mb-1 text-xs text-muted-foreground">
+                <span>🤖</span>
+                <span>AI Copilot</span>
+              </div>
+              <div className="px-4 py-3 rounded-2xl bg-[hsl(var(--cyan))]/10 border border-[hsl(var(--cyan))]/20">
+                <div className="flex gap-1">
+                  <span className="typing-dot w-2 h-2 rounded-full bg-[hsl(var(--cyan))]" />
+                  <span className="typing-dot w-2 h-2 rounded-full bg-[hsl(var(--cyan))]" />
+                  <span className="typing-dot w-2 h-2 rounded-full bg-[hsl(var(--cyan))]" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

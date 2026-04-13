@@ -72,6 +72,7 @@ const Room = () => {
   }, []);
 
   // Ensure room exists
+  const roomReady = useRef(false);
   useEffect(() => {
     if (!roomId) return;
     const ensureRoom = async () => {
@@ -81,6 +82,7 @@ const Room = () => {
       } else {
         setRoomData({ shipped: data.shipped, deployed_url: data.deployed_url });
       }
+      roomReady.current = true;
     };
     ensureRoom();
   }, [roomId]);

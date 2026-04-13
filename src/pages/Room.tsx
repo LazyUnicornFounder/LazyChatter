@@ -83,7 +83,7 @@ const Room = () => {
 
   // Load messages & subscribe to realtime
   useEffect(() => {
-    if (!roomId || !user) return;
+    if (!roomId || !chatUser) return;
 
     const loadMessages = async () => {
       const { data } = await supabase

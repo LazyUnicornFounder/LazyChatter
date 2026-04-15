@@ -9,11 +9,13 @@ import Room from "./pages/Room.tsx";
 import Auth from "./pages/Auth.tsx";
 import SavedRooms from "./pages/SavedRooms.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
@@ -30,6 +32,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
+    </ErrorBoundary>
 );
 
 export default App;

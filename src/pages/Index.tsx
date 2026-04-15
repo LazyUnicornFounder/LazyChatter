@@ -5,6 +5,7 @@ import DemoChat from '@/components/DemoChat';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import OpenSourceBanner from "@/components/OpenSourceBanner";
+import PortfolioFooter from "@/components/PortfolioFooter";
 
 const Index = () => {
   const { user, signOut } = useAuth();
@@ -123,6 +124,7 @@ const Index = () => {
         made for people with more ideas than time 😴
       </footer>
           <OpenSourceBanner />
+          <PortfolioFooter />
     </div>
   );
 };
